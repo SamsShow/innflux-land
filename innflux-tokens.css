@@ -1,0 +1,343 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Innflux Design System — Colors & Type
+   Programmable stablecoin credit infrastructure for banks.
+
+   This is the LIGHT-TONE variant of the system (institutional / banks).
+   For the dark-mode terminal variant see tokens/variables.css.
+
+   Brand DNA
+   ─────────
+     Primary teal (#24B98D) — pulled directly from the logo mark
+     Deep forest (#003629)  — wordmark + headlines in dark contexts
+     Mint cream (#E8FBF1)   — soft highlight surfaces
+     Off-white (#F7F6F1)    — primary page background (warm, paper-like)
+     Ink   (#0B1F18)         — deep green-black for body copy
+
+   Type pairing
+     Display / headlines : "DM Sans" (heavy, geometric, generous bowls)
+     Body / interface    : "Inter"   (neutral, optimized for UI)
+     Numeric / mono      : "JetBrains Mono" (tabular figures)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────────────── */
+  --innflux-teal:       #24B98D;   /* logo, primary CTA, links */
+  --innflux-teal-600:   #16A075;   /* hover */
+  --innflux-teal-700:   #0E8462;   /* active / dense text accent */
+  --innflux-teal-300:   #6FD7B5;   /* tints */
+  --innflux-teal-100:   #C7F0DF;   /* soft fill */
+  --innflux-mint:       #9AFFE0;   /* highlight chip (from landing) */
+  --innflux-mint-soft:  #E8FBF1;   /* hero gradient, card glow */
+  --innflux-forest:     #003629;   /* dark inversion bg + wordmark */
+  --innflux-forest-700: #0A4F3F;   /* hover on dark sections */
+  --innflux-cream:      #F7F6F1;   /* warm page bg */
+  --innflux-paper:      #FFFFFF;   /* card surface */
+  --innflux-ink:        #0B1F18;   /* primary text */
+
+  /* ── Background scale ─────────────────────────────────────────── */
+  --bg-app:        var(--innflux-cream);
+  --bg-surface:    var(--innflux-paper);
+  --bg-raised:     #FCFBF7;
+  --bg-sunken:     #EFEDE5;
+  --bg-inverse:    var(--innflux-forest);
+  --bg-accent:     var(--innflux-mint-soft);
+  --bg-accent-bold:var(--innflux-mint);
+
+  /* ── Text scale (against light bg) ───────────────────────────── */
+  --fg1:           var(--innflux-ink);          /* primary */
+  --fg2:           #3A4D45;                     /* secondary  ~8.6:1 on cream */
+  --fg3:           #5A6C64;                     /* tertiary   ~5.0:1 on cream (AA pass) — was #6B7C74 (fail) */
+  --fg-muted:      #7A8983;                     /* hints      ~3.3:1 — non-text decoration only */
+  --fg-disabled:   #C7CFCA;
+  --fg-link:       var(--innflux-teal-700);
+  --fg-on-dark:    #F7F6F1;                     /* primary text on forest */
+  --fg-on-dark-2:  rgba(247,246,241,0.72);
+  --fg-on-teal:    var(--innflux-forest);       /* text on mint/teal */
+  --fg-accent:     var(--innflux-teal-700);
+
+  /* ── Borders ──────────────────────────────────────────────────── */
+  --border-default:  rgba(11,31,24,0.10);
+  --border-subtle:   rgba(11,31,24,0.06);
+  --border-strong:   rgba(11,31,24,0.18);
+  --border-focus:    var(--innflux-teal);
+  --border-on-dark:  rgba(247,246,241,0.14);
+
+  /* ── Semantic ─────────────────────────────────────────────────── */
+  --success: #1FA970;
+  --success-bg: #E3F7EB;
+  --danger:  #D94343;
+  --danger-bg:  #FCEAEA;
+  --warning: #E0A013;
+  --warning-bg: #FBF1D6;
+  --info:    #2C7DE0;
+  --info-bg: #E5EFFA;
+
+  /* ── Type: families ──────────────────────────────────────────── */
+  --font-display: "DM Sans", "Inter", system-ui, sans-serif;
+  --font-sans:    "Inter", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", "SF Mono", Menlo, monospace;
+
+  /* ── Type: sizes (rem; 1rem = 16px) ──────────────────────────── */
+  --t-2xs:  0.6875rem;   /* 11 */
+  --t-xs:   0.75rem;     /* 12 */
+  --t-sm:   0.8125rem;   /* 13 */
+  --t-md:   0.9375rem;   /* 15 */
+  --t-base: 1rem;        /* 16 */
+  --t-lg:   1.125rem;    /* 18 */
+  --t-xl:   1.375rem;    /* 22 */
+  --t-2xl:  1.75rem;     /* 28 */
+  --t-3xl:  2.25rem;     /* 36 */
+  --t-4xl:  3rem;        /* 48 */
+  --t-5xl:  4.25rem;     /* 68 */
+  --t-6xl:  6rem;        /* 96 */
+  --t-7xl:  9rem;        /* 144 — full-bleed hero */
+
+  /* ── Type: weight ────────────────────────────────────────────── */
+  --w-regular:  400;
+  --w-medium:   500;
+  --w-semibold: 600;
+  --w-bold:     700;
+  --w-heavy:    800;
+
+  /* ── Type: leading & tracking ────────────────────────────────── */
+  --lh-tight:    1.05;
+  --lh-snug:     1.2;
+  --lh-normal:   1.5;
+  --lh-relaxed:  1.65;
+  --tk-tightest: -0.04em;
+  --tk-tight:    -0.025em;
+  --tk-normal:    0em;
+  --tk-wide:      0.02em;
+  --tk-label:     0.08em;  /* uppercase eyebrows */
+
+  /* ── Radius (rounded + bold) ─────────────────────────────────── */
+  --r-xs:   4px;
+  --r-sm:   8px;
+  --r-md:   12px;
+  --r-lg:   16px;
+  --r-xl:   24px;
+  --r-2xl:  32px;
+  --r-pill: 999px;
+
+  /* ── Shadow (paper, never harsh) ─────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(11,31,24,0.04);
+  --shadow-sm:  0 2px 6px rgba(11,31,24,0.06);
+  --shadow-md:  0 8px 24px -8px rgba(11,31,24,0.10);
+  --shadow-lg:  0 24px 48px -16px rgba(11,31,24,0.14);
+  --shadow-glow:0 0 0 6px rgba(36,185,141,0.18);
+  --shadow-ring:0 0 0 4px rgba(36,185,141,0.24);
+
+  /* ── Spacing ─────────────────────────────────────────────────── */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-8:  32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-20: 80px;
+  --s-24: 96px;
+  --s-32: 128px;
+
+  /* ── Motion ──────────────────────────────────────────────────── */
+  --dur-fast:   120ms;
+  --dur-base:   220ms;
+  --dur-slow:   400ms;
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── Reset-ish base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+body {
+  margin: 0;
+  background: var(--bg-app);
+  color: var(--fg1);
+  font-family: var(--font-sans);
+  font-size: var(--t-base);
+  line-height: var(--lh-normal);
+}
+::selection { background: var(--innflux-mint); color: var(--innflux-forest); }
+
+/* ─── Semantic typographic elements ───────────────────────────────── */
+.t-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--t-2xs);
+  font-weight: var(--w-medium);
+  letter-spacing: var(--tk-label);
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+.t-display, h1.t-display {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 7vw, var(--t-7xl));
+  font-weight: var(--w-bold);
+  line-height: 0.98;
+  letter-spacing: var(--tk-tightest);
+  color: var(--fg1);
+  margin: 0;
+}
+h1, .h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, var(--t-5xl));
+  font-weight: var(--w-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tk-tight);
+  color: var(--fg1);
+  margin: 0;
+}
+h2, .h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3.5vw, var(--t-4xl));
+  font-weight: var(--w-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tk-tight);
+  color: var(--fg1);
+  margin: 0;
+}
+h3, .h3 {
+  font-family: var(--font-display);
+  font-size: var(--t-2xl);
+  font-weight: var(--w-semibold);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tk-tight);
+  color: var(--fg1);
+  margin: 0;
+}
+h4, .h4 {
+  font-family: var(--font-sans);
+  font-size: var(--t-lg);
+  font-weight: var(--w-semibold);
+  line-height: var(--lh-snug);
+  color: var(--fg1);
+  margin: 0;
+}
+.lede {
+  font-family: var(--font-sans);
+  font-size: var(--t-xl);
+  font-weight: var(--w-regular);
+  line-height: var(--lh-relaxed);
+  color: var(--fg2);
+}
+p, .p {
+  font-family: var(--font-sans);
+  font-size: var(--t-base);
+  line-height: var(--lh-relaxed);
+  color: var(--fg2);
+  margin: 0;
+}
+.t-small {
+  font-size: var(--t-sm);
+  line-height: var(--lh-normal);
+  color: var(--fg3);
+}
+.t-mono, .num {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum", "zero";
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.t-num-lg {
+  font-family: var(--font-mono);
+  font-size: var(--t-3xl);
+  font-weight: var(--w-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--fg1);
+}
+a {
+  color: var(--fg-link);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: var(--innflux-teal-600); }
+
+/* ─── Inverse (forest dark sections) ──────────────────────────────── */
+.on-dark { color: var(--fg-on-dark); }
+.on-dark h1, .on-dark h2, .on-dark h3, .on-dark h4 { color: var(--fg-on-dark); }
+.on-dark p, .on-dark .lede { color: var(--fg-on-dark-2); }
+.on-dark .t-eyebrow { color: var(--innflux-mint); }
+
+/* ════════════════════════════════════════════════════════════
+   Motion library (verbatim from legend.xyz, verified 2026-05-13)
+   Imported into the system to power ambient cinematic motion.
+   All decorative animations disable under prefers-reduced-motion.
+   ════════════════════════════════════════════════════════════ */
+
+@keyframes sunset-blob {
+  0%    { transform: translate(0)             scale(1);    }
+  12.5% { transform: translate(36px, -42px)   scale(1.06); }
+  25%   { transform: translate(58px, -10px)   scale(1.10); }
+  37.5% { transform: translate(40px, 30px)    scale(1.04); }
+  50%   { transform: translate(8px, 54px)     scale(0.96); }
+  62.5% { transform: translate(-34px, 42px)   scale(0.92); }
+  75%   { transform: translate(-58px, 0)      scale(0.90); }
+  87.5% { transform: translate(-34px, -42px)  scale(0.96); }
+  100%  { transform: translate(0)             scale(1);    }
+}
+
+@keyframes sunset-fade-in {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes sunset-card-enter {
+  0%   { opacity: 0; filter: blur(6px); transform: translateY(30px) scale(0.985); }
+  100% { opacity: 1; filter: blur(0);   transform: translateY(0)    scale(1);     }
+}
+
+@keyframes sunset-line-glow {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(120%);  opacity: 0; }
+}
+
+@keyframes vault-breathe {
+  0%, 100% { opacity: var(--base-op, 1); }
+  50%      { opacity: calc(var(--base-op, 1) * 0.62); }
+}
+
+@keyframes counter-flash {
+  0%   { color: var(--innflux-teal-700); }
+  60%  { color: var(--innflux-teal-700); }
+  100% { color: var(--fg1); }
+}
+
+@keyframes marquee-x {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* IntersectionObserver entrance — applied via .is-in toggle */
+.fx-enter {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(30px) scale(0.985);
+  transition: opacity 700ms var(--ease-out),
+              filter   700ms var(--ease-out),
+              transform 700ms var(--ease-out);
+  will-change: opacity, filter, transform;
+}
+.fx-enter.is-in {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+}
+
+/* Global reduced-motion safety net */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .fx-enter { opacity: 1; filter: none; transform: none; transition: none; }
+}
