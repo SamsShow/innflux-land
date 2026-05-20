@@ -120,10 +120,198 @@ const fmtInt = (n) => Math.floor(n).toLocaleString("en-US");
 const fmtUSDshort = (n) =>
   "$" + Math.floor(n).toLocaleString("en-US");
 
+// ── Global motion FX: writes scroll + mouse vars used by parallax/glow CSS
+const useMotionFX = () => {
+  React.useEffect(() => {
+    const root = document.documentElement;
+    let scrollRaf = null;
+    const onScroll = () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        const sy = window.scrollY;
+        const ratio = sy / Math.max(1, window.innerHeight);
+        root.style.setProperty("--sy", sy + "px");
+        root.style.setProperty("--syRatio", ratio.toFixed(3));
+        scrollRaf = null;
+      });
+    };
+    const onMove = (e) => {
+      const hero = document.querySelector(".hero");
+      if (hero) {
+        const r = hero.getBoundingClientRect();
+        if (e.clientY >= r.top && e.clientY <= r.bottom) {
+          const mx = ((e.clientX - r.left) / r.width) * 100;
+          const my = ((e.clientY - r.top) / r.height) * 100;
+          hero.style.setProperty("--mx", mx.toFixed(1) + "%");
+          hero.style.setProperty("--my", my.toFixed(1) + "%");
+        }
+      }
+      // Cursor spotlight on dark sections (pixel-precise)
+      const spots = document.querySelectorAll(".cursor-spot");
+      for (let i = 0; i < spots.length; i++) {
+        const el = spots[i];
+        const r = el.getBoundingClientRect();
+        if (e.clientY < r.top || e.clientY > r.bottom) continue;
+        el.style.setProperty("--cx", (e.clientX - r.left).toFixed(0) + "px");
+        el.style.setProperty("--cy", (e.clientY - r.top).toFixed(0) + "px");
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("mousemove", onMove, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("mousemove", onMove);
+    };
+  }, []);
+};
+
+// ── Scroll reveal wrapper ────────────────────────────────────────────
+const Reveal = ({ as: Tag = "div", variant = "up", delay = 0, stagger = false, className = "", children, ...rest }) => {
+  const ref = React.useRef(null);
+  const [seen, setSeen] = React.useState(false);
+  React.useEffect(() => {
+    if (!ref.current || seen) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setSeen(true); io.disconnect(); }
+    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [seen]);
+  const cls = [
+    stagger ? "reveal-stagger" : "reveal",
+    !stagger ? "reveal-" + variant : "",
+    seen ? "is-in" : "",
+    className,
+  ].filter(Boolean).join(" ");
+  return (
+    <Tag ref={ref} className={cls} style={{ transitionDelay: delay ? delay + "ms" : undefined }} {...rest}>
+      {children}
+    </Tag>
+  );
+};
+
+// ── Count-up tied to in-view ─────────────────────────────────────────
+const useCountUp = (target, { duration = 1500, decimals = 0 } = {}) => {
+  const ref = React.useRef(null);
+  const [val, setVal] = React.useState(0);
+  const [seen, setSeen] = React.useState(false);
+  const reduced = useReducedMotion();
+  React.useEffect(() => {
+    if (!ref.current || seen) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setSeen(true); io.disconnect(); }
+    }, { threshold: 0.45 });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [seen]);
+  React.useEffect(() => {
+    if (!seen) return;
+    if (reduced) { setVal(target); return; }
+    const start = performance.now();
+    let raf;
+    const tick = (t) => {
+      const p = Math.min(1, (t - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(target * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [seen, target, duration, reduced]);
+  const display = decimals > 0 ? val.toFixed(decimals) : Math.round(val).toLocaleString();
+  return [ref, display];
+};
+
+const CountStat = ({ value, decimals = 0, suffix = "", prefix = "", className = "" }) => {
+  const [ref, txt] = useCountUp(value, { decimals });
+  return <span ref={ref} className={className}>{prefix}{txt}{suffix}</span>;
+};
+
+// ── Section watermark: huge outlined chapter number sitting behind content
+const SectionWatermark = ({ num, position = "tr", onDark = false }) => (
+  <span
+    className={"section-watermark pos-" + position + (onDark ? " on-dark" : "")}
+    aria-hidden="true"
+  >
+    {num}
+  </span>
+);
+
+// ── Scroll progress through a section. Writes CSS vars on the element:
+//    --p (0..1), --enter (0..1), --mid (0..1), --exit (0..1)
+//    Also toggles `<html class="<bodyClass>">` while the section is in
+//    its "active" range so global UI (e.g. nav) can react.
+//    Returns numeric p so React can lazy-mount on threshold.
+const useSectionProgress = (ref, { bodyClass, activeMin = 0.05, activeMax = 0.95 } = {}) => {
+  const [p, setP] = React.useState(0);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let raf = null;
+    let lastP = -1;
+    let wasActive = false;
+    const update = () => {
+      raf = null;
+      const r = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const total = Math.max(1, r.height - vh);
+      const np = Math.max(0, Math.min(1, -r.top / total));
+      const enter = Math.max(0, Math.min(1, np / 0.18));
+      const exit  = Math.max(0, Math.min(1, (np - 0.82) / 0.18));
+      const mid   = Math.max(0, Math.min(1, (np - 0.18) / 0.64));
+      el.style.setProperty("--p", np.toFixed(4));
+      el.style.setProperty("--enter", enter.toFixed(4));
+      el.style.setProperty("--mid", mid.toFixed(4));
+      el.style.setProperty("--exit", exit.toFixed(4));
+      if (bodyClass) {
+        const active = np > activeMin && np < activeMax;
+        if (active !== wasActive) {
+          document.documentElement.classList.toggle(bodyClass, active);
+          wasActive = active;
+        }
+      }
+      if (Math.abs(np - lastP) > 0.01) { setP(np); lastP = np; }
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    update();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      if (bodyClass) document.documentElement.classList.remove(bodyClass);
+    };
+  }, [ref, bodyClass, activeMin, activeMax]);
+  return p;
+};
+
+// ── Lazy mount: render heavy children only after the wrapper has been
+//    scrolled close to viewport. Until then renders a sized placeholder.
+const LazyMount = ({ rootMargin = "300px", minHeight = 320, placeholder = null, children }) => {
+  const ref = React.useRef(null);
+  const [mount, setMount] = React.useState(false);
+  React.useEffect(() => {
+    if (!ref.current || mount) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setMount(true); io.disconnect(); }
+    }, { rootMargin });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [mount, rootMargin]);
+  return (
+    <div ref={ref} style={{ minHeight: mount ? undefined : minHeight }}>
+      {mount ? children : placeholder}
+    </div>
+  );
+};
+
 Object.assign(window, {
   BrandMark, IconArrowRight, IconArrowLeft, Eyebrow,
   Nav, AnnouncementPill,
-  useTickingNumber, useReducedMotion,
+  useTickingNumber, useReducedMotion, useMotionFX,
+  Reveal, useCountUp, CountStat,
   fmtUSD, fmtInt, fmtUSDshort,
 });
 
@@ -256,6 +444,49 @@ const CounterBand = () => {
   );
 };
 
+// Hero live-ledger ticker — looks like a NOC feed for the network.
+// Marquee of plausible-looking settled loans, slow-paced, mono font.
+const LEDGER_ENTRIES = [
+  { id: "l_4827", amt: "500,000 NGN",   fintech: "Paystack NG",   t: "2.1s" },
+  { id: "l_4828", amt: "1,200,000 KES", fintech: "M-Shwari KE",   t: "1.8s" },
+  { id: "l_4829", amt: "415,000 PHP",   fintech: "Tonik PH",      t: "2.3s" },
+  { id: "l_4830", amt: "80,000 INR",    fintech: "KreditBee IN",  t: "1.6s" },
+  { id: "l_4831", amt: "175,000 GHS",   fintech: "Fido GH",       t: "2.0s" },
+  { id: "l_4832", amt: "950,000 KRW",   fintech: "Kakao Pay KR",  t: "2.4s" },
+  { id: "l_4833", amt: "275,000 NGN",   fintech: "Paystack NG",   t: "1.9s" },
+  { id: "l_4834", amt: "650,000 KES",   fintech: "M-Shwari KE",   t: "2.1s" },
+  { id: "l_4835", amt: "320,000 PHP",   fintech: "Tonik PH",      t: "1.7s" },
+  { id: "l_4836", amt: "120,000 INR",   fintech: "KreditBee IN",  t: "2.0s" },
+  { id: "l_4837", amt: "90,000 GHS",    fintech: "Fido GH",       t: "2.2s" },
+  { id: "l_4838", amt: "1,400,000 KRW", fintech: "Kakao Pay KR",  t: "1.9s" },
+];
+
+const LedgerTicker = () => (
+  <div className="hero-ledger" role="region" aria-label="Recent settled loans">
+    <span className="hero-ledger-meta">
+      <span className="dot" aria-hidden="true" />
+      <span>LIVE LEDGER</span>
+    </span>
+    <div className="hero-ledger-mask">
+      <div className="hero-ledger-track">
+        {[...LEDGER_ENTRIES, ...LEDGER_ENTRIES].map((e, i) => (
+          <span key={i} className="hero-ledger-entry" aria-hidden={i >= LEDGER_ENTRIES.length ? "true" : undefined}>
+            <span className="arrow">→</span>
+            <span className="lid">{e.id}</span>
+            <span className="sep">·</span>
+            <span className="amt">{e.amt}</span>
+            <span className="sep">·</span>
+            <span className="fin">{e.fintech}</span>
+            <span className="sep">·</span>
+            <span className="t">{e.t}</span>
+            <span className="ok">✓</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 const TrustBar = () => (
   <div className="trust-bar" role="region" aria-label="Trust signals — each item links to its proof">
     <a className="trust-item" href="https://innflux.io/audits/halborn-2026.pdf" target="_blank" rel="noopener">
@@ -300,6 +531,13 @@ const HeroSection = () => {
         "--glow-current": s.glow,
       }}
     >
+      <div className="hero-fx" aria-hidden="true">
+        <div className="hero-grid" />
+        <div className="hero-orb orb-1" />
+        <div className="hero-orb orb-2" />
+        <div className="hero-orb orb-3" />
+        <div className="hero-cursor-glow" />
+      </div>
       <div className="container">
         <div className="hero-announce-wrap">
           <AnnouncementPill />
@@ -329,12 +567,13 @@ const HeroSection = () => {
         </div>
 
         <CounterBand />
+        <LedgerTicker />
       </div>
     </section>
   );
 };
 
-Object.assign(window, { HeroSection, HeroTicker, CounterBand, TrustBar, useInViewOnce });
+Object.assign(window, { HeroSection, HeroTicker, CounterBand, TrustBar, LedgerTicker, useInViewOnce });
 
 
 /* ===== landing-radial.jsx ===== */
@@ -359,6 +598,7 @@ const RadialSection = () => {
   return (
     <section id="fintechs" className="radial-section guide-x"
       aria-labelledby="radial-h2">
+      <SectionWatermark num="02" position="tr" />
       <div className="container">
         <div className="radial-header">
           <Eyebrow num="02">For fintechs</Eyebrow>
@@ -637,46 +877,198 @@ const USP_LIST = [
   ["Granular",    "One vault per loan. Default isolation. No book-level contagion."],
 ];
 
+// ── Animated currency flow lines — drawn between inflow column, cluster
+//    grid, and outflow column. Lines are scrubbed by `--mid` via CSS.
+const FlowLines = ({ ready }) => {
+  const svgRef = React.useRef(null);
+  const [paths, setPaths] = React.useState([]);
+  const [box, setBox] = React.useState({ w: 0, h: 0 });
+
+  React.useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const viz = svg.parentElement;
+
+    const compute = () => {
+      const r = viz.getBoundingClientRect();
+      const W = r.width, H = r.height;
+      if (W < 10 || H < 10) return;
+
+      const pt = (el) => {
+        const eb = el.getBoundingClientRect();
+        return { x: eb.left - r.left + eb.width / 2, y: eb.top - r.top + eb.height / 2 };
+      };
+      const ptLeft = (el) => {
+        const eb = el.getBoundingClientRect();
+        return { x: eb.left - r.left, y: eb.top - r.top + eb.height / 2 };
+      };
+      const ptRight = (el) => {
+        const eb = el.getBoundingClientRect();
+        return { x: eb.right - r.left, y: eb.top - r.top + eb.height / 2 };
+      };
+
+      const lpRows = viz.querySelectorAll(".inflow-lp-row");
+      const cluster = viz.querySelector(".cluster-shell");
+      const outflowRows = viz.querySelectorAll(".outflow-row");
+      if (!cluster || lpRows.length === 0) return;
+
+      const cl = ptLeft(cluster);
+      const cr = ptRight(cluster);
+      const lines = [];
+
+      // Inflow LP rows → cluster (left → centre)
+      lpRows.forEach((el, i) => {
+        const p = ptRight(el);
+        const dx = cl.x - p.x;
+        const mid1 = p.x + dx * 0.55;
+        lines.push({
+          d: `M ${p.x.toFixed(1)} ${p.y.toFixed(1)} C ${mid1.toFixed(1)} ${p.y.toFixed(1)}, ${mid1.toFixed(1)} ${cl.y.toFixed(1)}, ${cl.x.toFixed(1)} ${cl.y.toFixed(1)}`,
+          idx: i,
+          side: "in",
+        });
+      });
+
+      // Cluster → outflow rows (centre → right). Sample 3 rows for clarity.
+      const sample = Array.from(outflowRows).filter((_, i) => i % 2 === 0).slice(0, 3);
+      sample.forEach((el, i) => {
+        const p = ptLeft(el);
+        const dx = p.x - cr.x;
+        const mid1 = cr.x + dx * 0.45;
+        lines.push({
+          d: `M ${cr.x.toFixed(1)} ${cr.y.toFixed(1)} C ${mid1.toFixed(1)} ${cr.y.toFixed(1)}, ${mid1.toFixed(1)} ${p.y.toFixed(1)}, ${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
+          idx: lpRows.length + i,
+          side: "out",
+        });
+      });
+
+      setBox({ w: W, h: H });
+      setPaths(lines);
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(viz);
+    const t = setTimeout(compute, 250);
+    const t2 = setTimeout(compute, 800);
+    return () => { ro.disconnect(); clearTimeout(t); clearTimeout(t2); };
+  }, [ready]);
+
+  return (
+    <svg
+      ref={svgRef}
+      className="flow-lines"
+      viewBox={`0 0 ${box.w || 100} ${box.h || 100}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <filter id="flow-glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <linearGradient id="flow-grad-in" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="rgba(154,255,224,0)" />
+          <stop offset="40%" stopColor="rgba(154,255,224,0.9)" />
+          <stop offset="100%" stopColor="rgba(36,185,141,0.9)" />
+        </linearGradient>
+        <linearGradient id="flow-grad-out" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="rgba(36,185,141,0.9)" />
+          <stop offset="60%" stopColor="rgba(154,255,224,0.9)" />
+          <stop offset="100%" stopColor="rgba(154,255,224,0)" />
+        </linearGradient>
+      </defs>
+      {paths.map((p) => (
+        <path
+          key={p.idx}
+          d={p.d}
+          className={"flow-path flow-" + p.side}
+          pathLength="1"
+          fill="none"
+          stroke={p.side === "in" ? "url(#flow-grad-in)" : "url(#flow-grad-out)"}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+          filter="url(#flow-glow)"
+          style={{ "--idx": p.idx }}
+        />
+      ))}
+    </svg>
+  );
+};
+
+const ClusterGridSkeleton = () => (
+  <div className="cluster-grid cluster-grid-skel" aria-hidden="true">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="cluster-card cluster-card-skel">
+        <div className="skel-bar" />
+        <div className="skel-grid">
+          {Array.from({ length: 12 }).map((_, j) => (
+            <span key={j} className="skel-tile" />
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 const VaultSection = () => {
-  const [cardRef, cardIn] = useInViewOnce({ threshold: 0.05, rootMargin: "0px 0px -5% 0px" });
+  const trackRef = React.useRef(null);
+  const p = useSectionProgress(trackRef, { bodyClass: "vault-pinned", activeMin: 0.04, activeMax: 0.92 });
+  // Mount heavy grid only once we're approaching the section
+  const showGrid = p > 0.04;
   return (
   <section id="how" className="vault-shell guide-x on-dark"
     aria-labelledby="vault-h2">
-    <div ref={cardRef} className={"vault-card fx-enter " + (cardIn ? "is-in" : "")}>
-      <div className="vault-header">
-        <Eyebrow num="03">How it works</Eyebrow>
-        <h2 id="vault-h2" className="h-xl">
-          One API. Six currencies.<br />
-          <span style={{ color: "var(--innflux-mint)" }}>Settlement in seconds.</span>
-        </h2>
-        <p className="lede">
-          Every loan you originate becomes a vault. Vaults cluster into credit
-          lines. Credit lines connect to global stablecoin liquidity. Local
-          fiat settles into your fintech's rails the moment you disburse.
-        </p>
-      </div>
+    <div className="vault-pin-track" ref={trackRef}>
+      <div className="vault-pin-frame">
+        <div className="vault-card vault-card-pinned cursor-spot">
+          <SectionWatermark num="03" position="tr" onDark />
+          <div className="vault-header">
+            <Eyebrow num="03">How it works</Eyebrow>
+            <h2 id="vault-h2" className="h-xl">
+              One API. Six currencies.<br />
+              <span style={{ color: "var(--innflux-mint)" }}>Settlement in seconds.</span>
+            </h2>
+            <p className="lede">
+              Every loan you originate becomes a vault. Vaults cluster into credit
+              lines. Credit lines connect to global stablecoin liquidity. Local
+              fiat settles into your fintech's rails the moment you disburse.
+            </p>
+          </div>
 
-      <div className="vault-viz">
-        <InflowColumn />
+          <div className="vault-viz">
+            <FlowLines ready={showGrid} />
+            <InflowColumn />
 
-        <div className="cluster-shell">
-          <span className="cluster-shell-label">INNFLUX · VAULT NETWORK</span>
-          <ClusterGrid />
+            <div className="cluster-shell">
+              <span className="cluster-shell-label">INNFLUX · VAULT NETWORK</span>
+              {showGrid ? <ClusterGrid /> : <ClusterGridSkeleton />}
+            </div>
+
+            <OutflowColumn />
+          </div>
+
+          <div className="usp-row">
+            {USP_LIST.map(([label, sub]) => (
+              <div className="usp" key={label}>
+                <div className="usp-head">
+                  <span className="usp-dot" />
+                  <span className="usp-label">{label}</span>
+                </div>
+                <div className="usp-sub">{sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <OutflowColumn />
-      </div>
-
-      <div className="usp-row">
-        {USP_LIST.map(([label, sub]) => (
-          <div className="usp" key={label}>
-            <div className="usp-head">
-              <span className="usp-dot" />
-              <span className="usp-label">{label}</span>
-            </div>
-            <div className="usp-sub">{sub}</div>
-          </div>
-        ))}
+        <div className="vault-pin-progress" aria-hidden="true">
+          <span className="vault-pin-track-line" />
+          <span className="vault-pin-fill" />
+          <span className="vault-pin-label">SECTION 03 · LIVE</span>
+        </div>
       </div>
     </div>
   </section>
@@ -714,14 +1106,15 @@ const PROOF_STATS = [
 
 // 4-stat band for v3 SocialSection (replaces the testimonial card)
 const PROOF_STATS_V3 = [
-  { num: "47K",   label: "Borrowers reached",       sub: "across 6 markets"        },
-  { num: "11d",   label: "Avg integration time",    sub: "from kickoff to mainnet" },
-  { num: "2.1s",  label: "Median settlement",       sub: "USDC → local fiat"       },
-  { num: "0.4%",  label: "Net loss · 12-month",     sub: "vault-isolated"          },
+  { value: 47,  decimals: 0, suffix: "K", label: "Borrowers reached",    sub: "across 6 markets"        },
+  { value: 11,  decimals: 0, suffix: "d", label: "Avg integration time", sub: "from kickoff to mainnet" },
+  { value: 2.1, decimals: 1, suffix: "s", label: "Median settlement",    sub: "USDC → local fiat"       },
+  { value: 0.4, decimals: 1, suffix: "%", label: "Net loss · 12-month",  sub: "vault-isolated"          },
 ];
 
 const SocialSection = () => (
   <section id="partners" className="social-section guide-x" aria-labelledby="social-h2">
+    <SectionWatermark num="04" position="tr" />
     <div className="container">
       <div className="social-header">
         <Eyebrow num="04">Proof + partners</Eyebrow>
@@ -736,30 +1129,35 @@ const SocialSection = () => (
       <div className="partner-eyebrow">
         <span className="t-eyebrow">Backed &amp; integrated with</span>
       </div>
-      <div className="partners-grid">
-        {PARTNERS.map((p) => (
-          <div key={p.name} className="partner-cell">
-            <span style={{ width: p.width, textAlign: "center" }}>{p.name}</span>
-          </div>
-        ))}
+      <div className="partner-marquee" aria-label="Partners">
+        <div className="partner-marquee-track">
+          {[...PARTNERS, ...PARTNERS, ...PARTNERS].map((p, idx) => (
+            <div key={p.name + "-" + idx} className="partner-cell" aria-hidden={idx >= PARTNERS.length ? "true" : undefined}>
+              <span style={{ width: p.width, textAlign: "center" }}>{p.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="proof-stats-row">
+      <Reveal stagger className="proof-stats-row" as="div">
         {PROOF_STATS_V3.map((s) => (
           <div className="proof-stat" key={s.label}>
-            <div className="proof-num">{s.num}</div>
+            <div className="proof-num">
+              <CountStat value={s.value} decimals={s.decimals} suffix={s.suffix} />
+            </div>
             <div className="proof-label">{s.label}</div>
             <div className="proof-sub">{s.sub}</div>
           </div>
         ))}
-      </div>
+      </Reveal>
     </div>
   </section>
 );
 
 const CtaSection = () => (
-  <section id="demo" className="cta-section guide-x"
+  <section id="demo" className="cta-section guide-x cursor-spot"
     aria-labelledby="cta-h2">
+    <SectionWatermark num="05" position="tl" onDark />
     <div className="container cta-content">
       <Eyebrow num="05">Build with Innflux</Eyebrow>
       <h2 id="cta-h2" className="display" style={{ margin: "32px 0 0" }}>
@@ -770,11 +1168,11 @@ const CtaSection = () => (
         Underwrite the borrower. We'll fund the book.
         Build with Innflux and ship a credit product in weeks, not quarters.
       </p>
-      <div className="ship-stat">
-        <span className="ship-stat-row"><span className="ship-stat-num">11d</span> avg integration</span>
-        <span className="ship-stat-row"><span className="ship-stat-num">14d</span> to first disbursement</span>
-        <span className="ship-stat-row"><span className="ship-stat-num">2s</span> per settlement</span>
-      </div>
+      <Reveal stagger className="ship-stat" as="div">
+        <span className="ship-stat-row"><span className="ship-stat-num"><CountStat value={11} suffix="d" /></span> avg integration</span>
+        <span className="ship-stat-row"><span className="ship-stat-num"><CountStat value={14} suffix="d" /></span> to first disbursement</span>
+        <span className="ship-stat-row"><span className="ship-stat-num"><CountStat value={2} suffix="s" /></span> per settlement</span>
+      </Reveal>
       <div className="actions">
         <a href="https://cal.com/innflux/demo" className="btn btn-mint btn-lg">
           Book a demo <IconArrowRight size={16} />
@@ -795,7 +1193,7 @@ const FOOTER_LINKS = [
 ];
 
 const Footer = () => (
-  <footer className="footer on-dark guide-x">
+  <footer className="footer on-dark guide-x cursor-spot">
     <div className="container">
       <div className="footer-moon-wrap">
         <div className="footer-moon">
@@ -842,7 +1240,7 @@ Object.assign(window, { SocialSection, CtaSection, Footer });
 const RegulatoryStrip = () => (
   <section className="regulatory-strip" aria-label="Regulatory and FX disclosure">
     <div className="container">
-      <div className="reg-grid">
+      <Reveal stagger className="reg-grid" as="div">
         <div className="reg-cell">
           <span className="reg-key">Lender of record</span>
           <span className="reg-val">licensed partner per market</span>
@@ -859,7 +1257,7 @@ const RegulatoryStrip = () => (
           <span className="reg-key">Custody</span>
           <span className="reg-val">Fireblocks · multisig · timelock</span>
         </div>
-      </div>
+      </Reveal>
     </div>
   </section>
 );
@@ -868,7 +1266,7 @@ const RegulatoryStrip = () => (
 const FounderNarrative = () => (
   <section className="founder-section" aria-labelledby="founder-h2">
     <div className="container">
-      <div className="founder-block">
+      <Reveal className="founder-block" as="div">
         <span className="t-eyebrow founder-eyebrow">Why we built Innflux</span>
         <blockquote className="founder-quote">
           <p>
@@ -893,16 +1291,32 @@ const FounderNarrative = () => (
             <span className="founder-name"><strong>Maya Lin</strong> · CTO · ex-Goldfinch, ex-Anchorage</span>
           </div>
         </div>
-      </div>
+      </Reveal>
     </div>
   </section>
 );
 
 // Developer teaser — answers Sanjay's #1 (curl in hero is table-stakes).
-const DeveloperPeek = () => (
-  <section className="dev-peek" aria-label="Try the API">
+const DeveloperPeek = () => {
+  // Note: IntersectionObserver does NOT fire on elements that have
+  // clip-path with full inset (Chromium treats them as not visible),
+  // so we observe the section wrapper instead and toggle the reveal
+  // class on the clipped pre child.
+  const sectionRef = React.useRef(null);
+  const [preIn, setPreIn] = React.useState(false);
+  React.useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setPreIn(true); io.disconnect(); }
+    }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+  <section ref={sectionRef} className="dev-peek" aria-label="Try the API">
     <div className="container">
-      <div className="dev-peek-inner">
+      <Reveal className="dev-peek-inner" as="div">
         <div className="dev-peek-copy">
           <span className="t-eyebrow">For developers</span>
           <h3 className="dev-peek-h">Underwrite a loan in two seconds.</h3>
@@ -915,7 +1329,7 @@ const DeveloperPeek = () => (
             <a href="https://status.innflux.io" className="dev-link">Status ↗</a>
           </div>
         </div>
-        <pre className="dev-peek-code" tabIndex={0} aria-label="Code example: underwrite a loan">
+        <pre className={"dev-peek-code typewriter " + (preIn ? "is-revealed" : "")} tabIndex={0} aria-label="Code example: underwrite a loan">
 <span className="code-comment"># Underwrite a 500,000 NGN loan against borrower performance data</span>
 <span className="code-cmd">$ curl https://api.innflux.io/v1/loans/underwrite \</span>
     <span className="code-flag">-H</span> <span className="code-string">"Authorization: Bearer $INNFLUX_KEY"</span> \
@@ -930,12 +1344,15 @@ const DeveloperPeek = () => (
   <span className="code-key">"settles_in"</span>: <span className="code-string">"2.1s"</span>
 {'}'}
         </pre>
-      </div>
+      </Reveal>
     </div>
   </section>
-);
+  );
+};
 
-const App = () => (
+const App = () => {
+  useMotionFX();
+  return (
   <React.Fragment>
     <Nav />
     <main id="main" tabIndex={-1}>
@@ -950,7 +1367,8 @@ const App = () => (
     </main>
     <Footer />
   </React.Fragment>
-);
+  );
+};
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
